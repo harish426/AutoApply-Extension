@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Auto Apply</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1 class="logo">Auto Apply</h1>
+    <div id="find-jobs-container">
+      <div class="question-container">
+        <input type="text" id="questionInput" placeholder="What jobs are you looking for?">
+        <button id="askButton">Ask</button>
+      </div>
+      <div id="chat-container"></div>
+    </div>
+
+<div class="resume-container">
+      <p>Your Resume: <a href="#" id="resumeLink" draggable="true">your-resume.pdf</a></p>
+    </div>
+
+    <div class="button-container">
+      <button id="getQuestionsButton" class="find-button">Find Input Fields</button>
+      <button id="fillButton" class="fill-button">Fill</button>
+    </div>
+
+    <div id="questionsContainer">
+      <!-- Found form fields will be displayed here -->
+    </div>
+
+
+
+    <div id="logout-container">
+      <button id="logoutButton">Logout</button>
+    </div>
+  </div>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
