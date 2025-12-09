@@ -1,5 +1,5 @@
 let foundFields = []; // Store found input fields globally
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   const askButton = document.getElementById('askButton');
   const questionInput = document.getElementById('questionInput');
   const chatContainer = document.getElementById('chat-container');
@@ -8,12 +8,12 @@ document.addEventListener('DOMContentLoaded', function() {
   const fillButton = document.getElementById('fillButton');
   const questionsContainer = document.getElementById('questionsContainer');
 
-  askButton.addEventListener('click', function() {
+  askButton.addEventListener('click', function () {
     const question = questionInput.value;
     if (question) {
       appendMessage(question, 'user');
       questionInput.value = '';
-      
+
       // Replace with your actual AI API call
       setTimeout(() => {
         const answer = `This is a placeholder answer to: \"${question}\"`;
@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // content.js
-if (resumeLink) {
+  if (resumeLink) {
     resumeLink.addEventListener('dragstart', (event) => {
       console.log('Drag started!');
       event.dataTransfer.setData('text/uri-list', resumeLink.href);
@@ -32,57 +32,91 @@ if (resumeLink) {
     });
   }
 
-  getQuestionsButton.addEventListener('click', function() {
+  getQuestionsButton.addEventListener('click', function () {
     if (getQuestionsButton.textContent === 'Finding...') {
-      return; 
+      return;
     }
     else {
-    getQuestionsButton.textContent = 'Finding...';
-    getQuestionsButton.disabled = true;
-    
-    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-      chrome.scripting.executeScript(
-        {
-          target: { tabId: tabs[0].id, allFrames: true },
-          function: findInputFields,
-        },
-        (injectionResults) => {
-          questionsContainer.innerHTML = '';
-          foundFields = []; // Reset stored fields
-          let allFieldsMap = new Map(); // Use Map to avoid duplicates by selector
-          
-          if (injectionResults) {
-            for (const frameResult of injectionResults) {
-              if (frameResult.result && Array.isArray(frameResult.result)) {
-                frameResult.result.forEach(field => {
-                  // Use selector as unique key
-                  allFieldsMap.set(field.selector, field);
-                });
+      getQuestionsButton.textContent = 'Finding...';
+      getQuestionsButton.disabled = true;
+
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        chrome.scripting.executeScript(
+          {
+            target: { tabId: tabs[0].id, allFrames: true },
+            function: findInputFields,
+          },
+          (injectionResults) => {
+            questionsContainer.innerHTML = '';
+            foundFields = []; // Reset stored fields
+            let allFieldsMap = new Map(); // Use Map to avoid duplicates by selector
+
+            if (injectionResults) {
+              for (const frameResult of injectionResults) {
+                if (frameResult.result && Array.isArray(frameResult.result)) {
+                  frameResult.result.forEach(field => {
+                    // Use selector as unique key
+                    allFieldsMap.set(field.selector, field);
+                  });
+                }
               }
             }
+
+            const fields = Array.from(allFieldsMap.values());
+            console.log('Found fields:', fields);
+
+            if (fields.length > 0) {
+              // Call Backend API
+              fetch('http://localhost:8000/generate-answers', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ fields: fields })
+              })
+                .then(async response => {
+                  if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(`Server error: ${response.status} ${text}`);
+                  }
+                  return response.json();
+                })
+                .then(answeredFields => {
+                  foundFields = answeredFields; // Store fields with answers
+
+                  answeredFields.forEach((field, index) => {
+                    createFormField(field, index);
+                  });
+
+                  getQuestionsButton.textContent = 'Find Input Fields';
+                  getQuestionsButton.disabled = false;
+                })
+                .catch(error => {
+                  console.error('Error fetching answers:', error);
+                  const errorDiv = document.createElement('div');
+                  errorDiv.textContent = `Error: ${error.message}. Is backend running?`;
+                  errorDiv.style.color = 'red';
+                  questionsContainer.appendChild(errorDiv);
+
+                  getQuestionsButton.textContent = 'Find Input Fields';
+                  getQuestionsButton.disabled = false;
+                });
+
+            } else {
+              const noFieldsDiv = document.createElement('div');
+              noFieldsDiv.textContent = 'No input fields found on this page.';
+              questionsContainer.appendChild(noFieldsDiv);
+
+              getQuestionsButton.textContent = 'Find Input Fields';
+              getQuestionsButton.disabled = false;
+            }
           }
+        );
+      });
+    }
+  });
 
-          foundFields = Array.from(allFieldsMap.values());
-
-          if (foundFields.length > 0) {
-            foundFields.forEach((field, index) => {
-              createFormField(field, index);
-            });
-          } else {
-            const noFieldsDiv = document.createElement('div');
-            noFieldsDiv.textContent = 'No input fields found on this page.';
-            questionsContainer.appendChild(noFieldsDiv);
-          }
-          
-          getQuestionsButton.textContent = 'Find Input Fields';
-          getQuestionsButton.disabled = false;
-        }
-      );
-    });
-  }
-});
-
-  fillButton.addEventListener('click', function() {
+  fillButton.addEventListener('click', function () {
     if (foundFields.length === 0) {
       alert('Please find input fields first!');
       return;
@@ -101,7 +135,7 @@ if (resumeLink) {
     }).filter(item => item.value.trim() !== ''); // Only send non-empty answers
 
     // Send answers to content script to fill the form
-    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       chrome.scripting.executeScript(
         {
           target: { tabId: tabs[0].id, allFrames: true },
@@ -144,6 +178,7 @@ if (resumeLink) {
     const answerInput = document.createElement('input');
     answerInput.type = 'text';
     answerInput.id = `answer-${index}`;
+    answerInput.value = field.answer || ''; // Pre-fill with answer
     answerInput.placeholder = 'Enter answer here...';
     answerInput.style.width = '100%';
     answerInput.style.padding = '5px';
@@ -169,7 +204,7 @@ function findInputFields() {
   const processedCheckboxNames = new Set();
 
   const inputs = document.querySelectorAll(
-    'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select'
+    'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="search"]), textarea, select'
   );
 
   inputs.forEach((input, idx) => {
@@ -366,20 +401,41 @@ function findInputFields() {
 
 // This function runs in the context of the webpage to fill fields
 function fillInputFields(answersArray) {
-  answersArray.forEach(answer => {
-    try {
-      const element = document.querySelector(answer.selector);
-      if (element) {
-        // Set the value
-        element.value = answer.value;
-        
-        // Trigger events to ensure the webpage detects the change
+  console.log('fillInputFields called with:', answersArray);
+
+  // Get all potential input fields on the page
+  const allInputs = document.querySelectorAll('input, select, textarea');
+  console.log('Found total inputs on page:', allInputs.length);
+
+  allInputs.forEach(element => {
+    // Skip hidden/irrelevant fields
+    if (element.type === 'hidden' || element.style.display === 'none') return;
+
+    // Find a matching answer for this element
+    const match = answersArray.find(answer => {
+      // Match by Selector
+      if (element.matches && element.matches(answer.selector)) return true;
+
+      // Fallback: Match by ID
+      if (element.id && answer.selector.includes(`#${element.id}`)) return true;
+
+      // Fallback: Match by Name
+      if (element.name && answer.selector.includes(`[name="${element.name}"]`)) return true;
+
+      return false;
+    });
+
+    if (match) {
+      console.log('Found match for element:', element, 'Value:', match.value);
+      try {
+        element.value = match.value;
         element.dispatchEvent(new Event('input', { bubbles: true }));
         element.dispatchEvent(new Event('change', { bubbles: true }));
         element.dispatchEvent(new Event('blur', { bubbles: true }));
+        console.log('Filled and dispatched events');
+      } catch (err) {
+        console.error('Error filling element:', element, err);
       }
-    } catch (error) {
-      console.error('Error filling field:', answer.selector, error);
     }
   });
 }
